@@ -290,8 +290,12 @@ const planoInterseccion = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
 
 function actualizarMouse(event) {
     const rect = renderer.domElement.getBoundingClientRect();
-    mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-    mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+    // Soporta tanto eventos del mouse como eventos de toque/pointer en mobile
+    const clientX = event.clientX !== undefined ? event.clientX : (event.touches && event.touches[0] ? event.touches[0].clientX : 0);
+    const clientY = event.clientY !== undefined ? event.clientY : (event.touches && event.touches[0] ? event.touches[0].clientY : 0);
+
+    mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
 }
 
 renderer.domElement.addEventListener("pointerdown", function(event) {
@@ -311,11 +315,18 @@ renderer.domElement.addEventListener("pointerdown", function(event) {
     piezaSeleccionada = obj;
     const esc = piezaSeleccionada.userData.escalaBase * 1.15;
     piezaSeleccionada.scale.set(esc, esc, esc);
-    renderer.domElement.setPointerCapture(event.pointerId);
+    
+    // Bloquea el puntero al canvas para no perderlo al arrastrar rápido en Android
+    if (renderer.domElement.setPointerCapture) {
+        renderer.domElement.setPointerCapture(event.pointerId);
+    }
 });
 
 renderer.domElement.addEventListener("pointermove", function(event) {
     if (piezaSeleccionada === null) return;
+
+    // Evita que Android interprete el arrastre como scroll o pull-to-refresh
+    event.preventDefault();
 
     actualizarMouse(event);
     raycaster.setFromCamera(mouse, camera);
@@ -327,17 +338,29 @@ renderer.domElement.addEventListener("pointermove", function(event) {
         piezaSeleccionada.position.x = punto.x;
         piezaSeleccionada.position.y = punto.y;
     }
-});
+}, { passive: false }); // { passive: false } es VITAL para que preventDefault funcione en Android
 
-renderer.domElement.addEventListener("pointerup", function() {
+function soltarPieza(event) {
     if (piezaSeleccionada === null) return;
 
     const pieza = piezaSeleccionada;
     const esc = pieza.userData.escalaBase;
     pieza.scale.set(esc, esc, esc);
     comprobarPieza(pieza);
+
+    if (event && renderer.domElement.releasePointerCapture && event.pointerId !== undefined) {
+        try {
+            renderer.domElement.releasePointerCapture(event.pointerId);
+        } catch (e) {
+            // Ignorar si ya se había liberado automáticamente
+        }
+    }
+
     piezaSeleccionada = null;
-});
+}
+
+renderer.domElement.addEventListener("pointerup", soltarPieza);
+renderer.domElement.addEventListener("pointercancel", soltarPieza); // Android usa pointercancel si una notificación o gesto interrumpe el toque
 
 // ------------------------------------------
 // FUNCIONES DEL MODAL DE CÓDIGO PREMIUM
