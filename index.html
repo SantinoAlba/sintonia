@@ -52,10 +52,12 @@
       height: 100vh;
     }
 
+    /* Evita que Android capture los gestos de scroll/zoom sobre el juego */
     canvas {
-      display: block;
-      width: 100vw;
-      height: 100vh;
+      touch-action: none !important;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
     }
 
     /* ESTILO BASE PARA LOS RECUADROS DECORADOS */
